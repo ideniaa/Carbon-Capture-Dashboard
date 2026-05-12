@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+start.bat
+start_website.cmd
+titrator_notes.json
+voltage_notes.json
+command_log.json
+voltage_command_log.json
+titrolyzer_app.pid
+windaq_mssql.pid
+start_silent.vbs

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Operations Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">TEAM CONTROL SITE</p>
+        <h1>Machine monitoring and control in one shared workspace.</h1>
+        <p class="hero-copy">
+          A first-pass dashboard for your team with live values, history, charting,
+          protected command actions, and spreadsheet export.
+        </p>
+      </div>
+      <div class="hero-status">
+        <div class="status-pill" id="connection-pill">
+          <span class="status-dot"></span>
+          <span id="connection-text">Connected to simulator</span>
+        </div>
+        <p class="hero-meta">Refresh interval: <strong>4 seconds</strong></p>
+        <p class="hero-meta">Graph range: <strong>last 12 readings</strong></p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="panel panel-monitor">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Monitor</p>
+            <h2>Live machine overview</h2>
+          </div>
+          <p class="section-note">Clear status cards for quick team handoff.</p>
+        </div>
+
+        <div class="card-grid status-grid">
+          <article class="metric-card accent-blue">
+            <span class="metric-label">Sequence State</span>
+            <strong class="metric-value" id="sequence-status">Idle</strong>
+            <span class="metric-subtext">Current machine cycle</span>
+          </article>
+          <article class="metric-card accent-gold">
+            <span class="metric-label">Program A</span>
+            <strong class="metric-value" id="program-a-status">Standby</strong>
+            <span class="metric-subtext">Trigger address 32</span>
+          </article>
+          <article class="metric-card accent-green">
+            <span class="metric-label">Program B</span>
+            <strong class="metric-value" id="program-b-status">Standby</strong>
+            <span class="metric-subtext">Trigger address 33</span>
+          </article>
+          <article class="metric-card accent-red">
+            <span class="metric-label">Analyzer Timestamp</span>
+            <strong class="metric-value compact" id="analyzer-timestamp">--:--:--</strong>
+            <span class="metric-subtext">Most recent reading</span>
+          </article>
+        </div>
+
+        <div class="card-grid reading-grid">
+          <article class="reading-card">
+            <span class="metric-label">Latest R1</span>
+            <strong class="reading-value" id="r1-value">0.00</strong>
+            <span class="reading-trend" id="r1-trend">Stable</span>
+          </article>
+          <article class="reading-card">
+            <span class="metric-label">Latest R2</span>
+            <strong class="reading-value" id="r2-value">0.00</strong>
+            <span class="reading-trend" id="r2-trend">Stable</span>
+          </article>
+          <article class="reading-card">
+            <span class="metric-label">Reading Age</span>
+            <strong class="reading-value compact" id="reading-age">0 sec</strong>
+            <span class="reading-trend">Auto-refresh active</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel panel-visual">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Visualize</p>
+            <h2>Recent values</h2>
+          </div>
+          <button class="ghost-button" id="toggle-series">Hide R2</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trend-chart" width="960" height="360" aria-label="Recent R1 and R2 values chart"></canvas>
+        </div>
+        <div class="legend">
+          <span><i class="legend-swatch swatch-r1"></i>R1</span>
+          <span><i class="legend-swatch swatch-r2"></i>R2</span>
+        </div>
+      </section>
+
+      <section class="panel panel-control">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Control</p>
+            <h2>Protected machine actions</h2>
+          </div>
+          <p class="section-note">Each action asks for confirmation before sending.</p>
+        </div>
+
+        <div class="control-layout">
+          <div class="control-box">
+            <h3>Sequence commands</h3>
+            <div class="control-buttons">
+              <button class="command-button start" data-command="Start Sequence" data-address="0">Start Sequence</button>
+              <button class="command-button stop" data-command="Stop Sequence" data-address="1">Stop Sequence</button>
+              <button class="command-button break" data-command="Break Sequence" data-address="2">Break Sequence</button>
+            </div>
+          </div>
+
+          <div class="control-box">
+            <h3>Program triggers</h3>
+            <div class="control-buttons">
+              <button class="command-button neutral" data-command="Trigger Program A" data-address="32">Trigger A</button>
+              <button class="command-button neutral" data-command="Trigger Program B" data-address="33">Trigger B</button>
+            </div>
+          </div>
+
+          <aside class="command-log">
+            <h3>Command log</h3>
+            <ul id="command-log-list"></ul>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel panel-history">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">History</p>
+            <h2>Recent readings table</h2>
+          </div>
+          <div class="history-actions">
+            <button class="ghost-button" id="add-reading">Add reading now</button>
+            <button class="solid-button" id="export-data">Export to Excel-friendly CSV</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>R1</th>
+                <th>R2</th>
+                <th>Sequence</th>
+                <th>Program A</th>
+                <th>Program B</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
