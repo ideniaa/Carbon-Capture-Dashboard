@@ -1,161 +1,190 @@
-# Local Team Dashboard
+# Carbon Capture Dashboard
 
-This is a Flask-based internal dashboard prototype meant to stay on your local team network.
+A web dashboard for tracking carbon capture lab data. It runs on your computer and lets your whole team view and log readings from one shared webpage.
 
-## What it includes
+---
 
-- Live dashboard cards for machine status
-- Recent readings chart and history table
-- Protected control buttons with confirmation prompts
-- XLSX export for Excel
-- Manual chlorine measurement entry with timestamp and note
-- SQL Server-backed storage for chlorine, results, titrator history, and voltage data
+## What does it do?
 
-## Run locally
+The dashboard has six pages (tabs) you can switch between:
 
-1. Create a virtual environment if you want:
-   `python -m venv .venv`
-2. Activate it:
-   `.\.venv\Scripts\Activate.ps1`
-3. Install packages:
-   `pip install -r requirements.txt`
-4. Start the app:
-   `python app.py`
-5. Open:
-   `http://127.0.0.1:5000`
+| Page | What it's for |
+|---|---|
+| **Home** | See a summary of everything at once — latest readings, mini charts, and team announcements |
+| **Titrator** | View live titrator readings (R1 & R2), send machine commands, and see a chart of recent values |
+| **Chlorine** | Log chlorine measurements (mg/L) with timestamps and notes |
+| **Results** | Enter experiment results like pH, current, flow rates, and CIER |
+| **Voltage** | See voltage channel readings from the WINDAQ recorder |
+| **WinCC** | View process data pulled directly from WinCC SQL tables |
 
-## Local-team access
+You can also download any table as an Excel file from within each page.
 
-When you are ready to share it only inside your team:
+---
 
-- Run the Flask app on a machine inside your local network
-- Use a local IP or machine name like `http://your-pc-name:5000`
-- Do not expose the port publicly
-- Restrict access with your firewall or network rules
+## How to run it
 
-## SQL Server setup
+> You need Python installed. If you don't have it, download it from [python.org](https://www.python.org/downloads/).
 
-For the titrator, the website defaults to the same SQL table used by `C:\Titrolyzer\Titrolyzer.py`:
+### Step 1 — Download or clone the project
 
-- Server: set via `SQL_SERVER` env var (or read from `Titrolyzer.py` at startup)
-- Database: set via `SQL_DATABASE` env var
-- Table: `dbo.Titrolyzer`
-- Columns: `RecordID`, `ReadingTime`, `Timestamp`, `Result_ID`, `Value`
-
-If `C:\Titrolyzer\Titrolyzer.py` exists, the website reads those SQL constants from that script at startup. Environment variables still override the script values.
-
-The app now supports two SQL connection styles:
-
-- A full `SQL_SERVER_CONNECTION_STRING`
-- Or separate environment variables for server, database, and login
-
-Example PowerShell setup with SQL auth:
-
-```powershell
-$env:SQL_SERVER="YOUR_SERVER\SQLEXPRESS"
-$env:SQL_DATABASE="YOUR_DATABASE"
-$env:SQL_USERNAME="your_username"
-$env:SQL_PASSWORD="your_password"
+If you have Git:
+```bash
+git clone https://github.com/ideniaa/Carbon-Capture-Dashboard.git
+cd Carbon-Capture-Dashboard
 ```
 
-If you prefer, you can still use one full connection string instead:
+Or just download the ZIP from GitHub and unzip it.
+
+### Step 2 — Create a virtual environment (optional but recommended)
+
+This keeps the project's packages separate from the rest of your system.
 
 ```powershell
-$env:SQL_SERVER_CONNECTION_STRING="DRIVER={SQL Server};SERVER=YOUR_SERVER\SQLEXPRESS;DATABASE=YOUR_DATABASE;UID=your_username;PWD=your_password;"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Behavior:
-
-- `dbo.Chlorine` is created automatically if it does not exist.
-- `dbo.Results` is created automatically if it does not exist.
-- `dbo.Titrolyzer` is created automatically if it does not exist and is read using these default columns:
-  `RecordID`, `ReadingTime`, `Timestamp`, `Result_ID`, `Value`
-- `dbo.Voltage` is reused on every start. If it does not exist yet, WINDAQ-MSSQL creates it with the connected device channels.
-
-Voltage defaults:
-
-- Fixed table: `Voltage`
-- Auto-detect table pattern: `V%` only if fixed-table behavior is disabled in code
-- Row id column: `row_num`
-- Timestamp column: `date_time`
-- Channel columns: read from the actual `dbo.Voltage` table; the website does not create guessed voltage channels
-- Note column: optional and blank by default
-
-If your voltage table uses different names, set these environment variables before starting Flask:
-
-```powershell
-$env:SQL_VOLTAGE_TABLE="Voltage"
-$env:SQL_VOLTAGE_TABLE_PATTERN="V%"
-$env:SQL_VOLTAGE_ROW_ID_COLUMN="row_num"
-$env:SQL_VOLTAGE_TIMESTAMP_COLUMN="date_time"
-$env:SQL_VOLTAGE_CH1_COLUMN="channel_1"
-$env:SQL_VOLTAGE_CH2_COLUMN="channel_2"
-$env:SQL_VOLTAGE_CH3_COLUMN="channel_3"
-$env:SQL_VOLTAGE_CH4_COLUMN="channel_4"
-$env:SQL_VOLTAGE_NOTE_COLUMN=""
+On Mac/Linux:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Notes:
+### Step 3 — Install the required packages
 
-- If SQL is not configured, the app falls back to local seeded/manual data.
-- The chlorine and results tables can be cleared from the dashboard.
-- The titrator clear action deletes rows from the SQL-backed titrator table.
-- The voltage clear action deletes rows from `dbo.Voltage`.
-- The chlorine table SQL is also included in `sql/chlorine_measurements.sql`.
-- The voltage chart reads channel columns from `dbo.Voltage`, excluding the timestamp, row id, and optional note columns. Once rows exist, it only shows columns that actually contain data.
-- If your SQL voltage table does not have a note column, voltage notes will stay in the UI but will not persist to SQL unless you add one.
-
-## WINDAQ-MSSQL control
-
-The voltage page can try to launch and stop `WINDAQ-MSSQL` from the website if you tell the app where the recorder executable lives.
-
-```powershell
-$env:WINDAQ_MSSQL_EXE="C:\Path\To\WINDAQ-MSSQL.exe"
-$env:WINDAQ_MSSQL_PROCESS_NAME="WINDAQ-MSSQL"
-$env:WINDAQ_MSSQL_PID_FILE="C:\Path\To\windaq_mssql.pid"
-$env:WINDAQ_MSSQL_AUTO_START="1"
+```bash
+pip install -r requirements.txt
 ```
 
-Notes:
+### Step 4 — Set up your settings
 
-- `WINDAQ_MSSQL_EXE` is used for the Start button.
-- `WINDAQ_MSSQL_PROCESS_NAME` is used for the Stop button. If you leave it unset, the app derives the process name from the executable path.
-- `WINDAQ_MSSQL_AUTO_START=1` makes the website select the first listed DATAQ device, fill the SQL fields from the website settings, click Connect, and send WINDAQ-MSSQL's Start command.
-- Before launching, the website sets WINDAQ-MSSQL's saved Table Name setting to `dbo.Voltage`. If the table does not exist yet, WINDAQ-MSSQL creates it with the connected device's real channel columns.
-- If `dbo.Voltage` exists but has zero rows, the Start button lets WINDAQ-MSSQL recreate it so the column count matches the connected device instead of an old guessed schema.
-- The Start button will not open a second WINDAQ-MSSQL session if one is already running. The app tracks the started process with a local PID file, defaulting to `windaq_mssql.pid` in the website folder.
-- WINDAQ-MSSQL still requires WinDaq Acquisition to be running. If that program is not acquiring data, WINDAQ-MSSQL may open a prompt after the website sends Start.
-- The voltage Excel export always uses the website layout: `Timestamp`, voltage channel columns, and `Note`.
-
-## Titrolyzer app control
-
-The Titrator tab has App commands for starting and stopping the Titrolyzer app. By default it launches:
-
-```powershell
-C:\Titrolyzer\Titrolyzer.py
+```bash
+copy .env.example .env
 ```
 
-Override the script path or Python executable if needed:
+Then open `.env` in any text editor and fill in your details (see the Configuration section below).
 
-```powershell
-$env:TITROLYZER_APP_PATH="C:\Titrolyzer\Titrolyzer.py"
-$env:TITROLYZER_PYTHON_EXE="C:\Path\To\python.exe"
+### Step 5 — Start the app
+
+```bash
+python app.py
 ```
 
-The Stop button closes the process that was started from the website by using a local PID file. It will not kill unrelated Python processes.
+### Step 6 — Open in your browser
 
-## Titrator machine commands
+Go to: **http://127.0.0.1:5000**
 
-The Titrator tab writes TRUE to the Program Control coils from the communication manual. The website displays the manual addresses, while the Python Modbus client writes to zero-based offsets internally:
+> To share with teammates on the same network, use your computer's local IP address instead, like `http://192.168.1.50:5000`.
 
-- Start Sequence: manual coil `1`
-- Stop Sequence: manual coil `2`
-- Break Sequence: manual coil `3`
-- Trigger Program A: manual coil `33`
-- Trigger Program B: manual coil `34`
-- Trigger Program X: manual coil `35`
+---
 
+## Configuration (the .env file)
 
-## Optional SQL Server driver
+When you copied `.env.example` to `.env`, it created a settings file. Here's what each section means:
 
-The dashboard can run without SQL Server first, but live SQL viewing requires a SQL Server ODBC driver installed on Windows plus the Python packages in `requirements.txt`.
+### Basic setting
+
+```
+SECRET_KEY=change-me-to-a-random-string
+```
+Change this to any random string. It keeps your session secure.
+
+### Connecting to the titrator machine (Modbus)
+
+```
+MODBUS_HOST=           ← IP address of the titrator (e.g. 10.0.0.50)
+MODBUS_PORT=502        ← leave this as 502 unless told otherwise
+MODBUS_UNIT_ID=2       ← unit ID of the device
+```
+
+If you leave `MODBUS_HOST` blank, the buttons still work in the UI — they just won't send real commands to a machine. Good for testing.
+
+### Connecting to SQL Server (for live data)
+
+Fill in your database details:
+
+```
+SQL_SERVER=YOUR_SERVER\SQLEXPRESS
+SQL_DATABASE=YOUR_DATABASE
+SQL_USERNAME=your_username
+SQL_PASSWORD=your_password
+```
+
+> If you don't have SQL Server set up, that's fine — the app uses built-in sample data instead and still loads normally.
+
+### WinDAQ recorder (Voltage page)
+
+```
+WINDAQ_MSSQL_EXE=C:\WINDAQMSSQL\WINDAQMSSQL.exe
+```
+
+Set this to the path of your WinDAQ-MSSQL app. The Voltage page can then start and stop it from the browser.
+
+### Titrolyzer app (Titrator page)
+
+```
+TITROLYZER_APP_PATH=C:\Titrolyzer\Titrolyzer.py
+```
+
+Set this to the path of your Titrolyzer script. The Titrator page can then start and stop it from the browser.
+
+---
+
+## Files in this project
+
+```
+app.py               The main app — all the logic lives here
+requirements.txt     List of Python packages needed
+.env.example         Template for your settings file
+index.html           Older standalone demo page (no Flask needed)
+script.js            JavaScript for the standalone demo page
+
+templates/           HTML pages for each tab
+  home.html          Home page
+  titrator.html      Titrator page
+  chlorine.html      Chlorine page
+  results.html       Results page
+  voltage.html       Voltage page
+  wincc.html         WinCC page
+  base.html          Shared layout (nav bar, etc.)
+
+static/
+  styles.css         Styling for the whole site
+  script.js          Live updates for the titrator page
+  inline-notes.js    Click-to-edit notes in tables
+
+sql/
+  chlorine_measurements.sql   SQL script to create the Chlorine table manually
+```
+
+---
+
+## Common questions
+
+**The app loaded but I don't see any real data.**
+That's normal if SQL Server isn't set up. The app shows sample/seeded data so you can still explore the interface.
+
+**How do I share it with my team?**
+Run the app on one computer, then everyone on the same network can open `http://<your-ip>:5000` in their browser.
+
+**Where does my data get saved?**
+- If SQL Server is configured: data is saved to the database.
+- If not: titrator and chlorine data stay in memory while the app is running. Notes and command logs are saved as small JSON files next to `app.py`.
+
+**How do I export data?**
+Each tab has a "Download Excel Sheet" button. The Home page also has a bulk download where you can pick which tables to export.
+
+**What Python version do I need?**
+Python 3.10 or newer is recommended.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `pip install` fails | Make sure your virtual environment is activated first |
+| App won't start | Check that all packages installed without errors |
+| Can't connect to SQL | Double-check the server name, database name, and credentials in `.env` |
+| Teammates can't reach the site | Make sure your firewall allows connections on port 5000 |
+| WinDAQ won't start from browser | Set `WINDAQ_MSSQL_EXE` to the correct path in `.env` |
