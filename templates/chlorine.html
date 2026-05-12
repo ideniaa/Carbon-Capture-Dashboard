@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">New Entry</p>
+        <h2>Manual data entry</h2>
+      </div>
+      <p class="section-note"></p>
+    </div>
+
+    <div class="chlorine-layout">
+      <div class="control-box">
+        <h3>Add a chlorine measurement</h3>
+        <form class="entry-form" method="post" action="{{ url_for('create_chlorine_measurement') }}">
+          <input type="hidden" name="unit" value="mg/L">
+          <label>
+            <span>Measurement (mg/L)</span>
+            <input name="value" type="number" step="0.01" placeholder="2.35" required>
+          </label>
+          <label>
+            <span>Timestamp</span>
+            <input name="timestamp" type="datetime-local">
+          </label>
+          <label>
+            <span>Note</span>
+            <textarea name="note" rows="4" placeholder="Optional note"></textarea>
+          </label>
+          <button class="solid-button" type="submit">Save entry</button>
+        </form>
+      </div>
+
+      <div class="control-box">
+        <h3>Operator notes</h3>
+        <textarea id="operatorNote" rows="6" placeholder="Type a note here — saved in your browser automatically." style="width:100%;resize:vertical;padding:0.5rem;font-size:0.9rem;border:1px solid var(--line);border-radius:12px;background:var(--panel-strong);color:var(--ink);"></textarea>
+        <p class="placeholder-copy" style="margin-top:0.5rem;font-size:0.8rem;">Notes are saved locally in your browser and do not reset on page refresh.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel-visual">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Visualize</p>
+        <h2>Chlorine readings over time</h2>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chlorine-chart" width="960" height="300" aria-label="Chlorine readings over time"></canvas>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">History</p>
+        <h2>Saved chlorine measurements</h2>
+      </div>
+      <div class="history-actions">
+        <a class="link-button" href="{{ url_for('export_chlorine') }}">Download Excel Sheet</a>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Measurement (mg/L)</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="chlorine-tbody">
+          {% for row in chlorine_measurements %}
+          <tr data-rowkey="{{ row.timestamp_key }}" data-note="{{ row.note or '' }}">
+            <td>{{ row.timestamp }}</td>
+            <td>{{ row.value }}</td>
+            <td class="note-cell"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-actions">
+      <form method="post" action="{{ url_for('clear_chlorine') }}">
+        <button class="danger-button" type="submit" onclick="return confirm('Clear all chlorine measurements?')">Clear table</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const note = document.getElementById('operatorNote');
+  note.value = localStorage.getItem('operatorNote') || '';
+  note.addEventListener('input', () => localStorage.setItem('operatorNote', note.value));
+</script>
+<script src="{{ url_for('static', filename='inline-notes.js') }}"></script>
+<script>
+  initNoteCells("chlorine-tbody", "/api/chlorine-note");
+
+  const chlorineData = {{ chlorine_measurements|tojson }};
+  const chlorineCanvas = document.getElementById("chlorine-chart");
+  const chlorineCtx = chlorineCanvas.getContext("2d");
+
+  function resizeChlorineCanvas() {
+    const wrapper = chlorineCanvas.parentElement;
+    if (!wrapper) return;
+    const width = Math.max(480, Math.floor(wrapper.clientWidth));
+    chlorineCanvas.width = width;
+    chlorineCanvas.height = 360;
+  }
+
+  function drawChlorineChart() {
+    resizeChlorineCanvas();
+    const { width, height } = chlorineCanvas;
+    chlorineCtx.clearRect(0, 0, width, height);
+
+    const rows = [...chlorineData].reverse();
+    if (!rows.length) {
+      chlorineCtx.fillStyle = "#6b7280";
+      chlorineCtx.font = "16px Bahnschrift";
+      chlorineCtx.fillText("No chlorine measurements yet", 24, 40);
+      return;
+    }
+
+    const values = rows.map((row) => parseFloat(row.value) || 0);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const padding = Math.max((maxValue - minValue) * 0.1, 0.5);
+    const lo = minValue - padding;
+    const hi = maxValue + padding;
+
+    const left = 72;
+    const right = width - 22;
+    const top = 28;
+    const bottom = height - 58;
+    const plotWidth = right - left;
+    const plotHeight = bottom - top;
+
+    chlorineCtx.strokeStyle = "rgba(31, 41, 51, 0.12)";
+    chlorineCtx.lineWidth = 1;
+    for (let i = 0; i <= 4; i += 1) {
+      const y = top + (plotHeight / 4) * i;
+      chlorineCtx.beginPath();
+      chlorineCtx.moveTo(left, y);
+      chlorineCtx.lineTo(right, y);
+      chlorineCtx.stroke();
+      const tickValue = (hi - ((hi - lo) / 4) * i).toFixed(2);
+      chlorineCtx.fillStyle = "#6b7280";
+      chlorineCtx.font = "12px Bahnschrift";
+      chlorineCtx.textAlign = "right";
+      chlorineCtx.fillText(tickValue, left - 8, y + 4);
+    }
+
+    const pointFor = (value, index) => {
+      const x = left + (rows.length === 1 ? plotWidth / 2 : (plotWidth / Math.max(rows.length - 1, 1)) * index);
+      const y = bottom - ((value - lo) / (hi - lo)) * plotHeight;
+      return { x, y };
+    };
+
+    chlorineCtx.strokeStyle = "#1e5eff";
+    chlorineCtx.lineWidth = 3;
+    chlorineCtx.beginPath();
+    rows.forEach((row, idx) => {
+      const point = pointFor(parseFloat(row.value) || 0, idx);
+      if (idx === 0) {
+        chlorineCtx.moveTo(point.x, point.y);
+      } else {
+        chlorineCtx.lineTo(point.x, point.y);
+      }
+    });
+    chlorineCtx.stroke();
+
+    rows.forEach((row, idx) => {
+      const point = pointFor(parseFloat(row.value) || 0, idx);
+      chlorineCtx.beginPath();
+      chlorineCtx.fillStyle = "#ffffff";
+      chlorineCtx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      chlorineCtx.fill();
+      chlorineCtx.strokeStyle = "#1e5eff";
+      chlorineCtx.lineWidth = 2;
+      chlorineCtx.stroke();
+    });
+
+    const maxLabels = Math.max(2, Math.floor(plotWidth / 100));
+    const step = Math.max(1, Math.ceil(rows.length / maxLabels));
+    chlorineCtx.fillStyle = "#6b7280";
+    chlorineCtx.font = "12px Bahnschrift";
+    chlorineCtx.textAlign = "center";
+    rows.forEach((row, idx) => {
+      if (idx % step === 0) {
+        const point = pointFor(parseFloat(row.value) || 0, idx);
+        chlorineCtx.fillText(row.timestamp, point.x, bottom + 18);
+      }
+    });
+
+    chlorineCtx.save();
+    chlorineCtx.fillStyle = "#94a3b8";
+    chlorineCtx.font = "11px Bahnschrift";
+    chlorineCtx.textAlign = "center";
+    chlorineCtx.translate(12, (top + bottom) / 2);
+    chlorineCtx.rotate(-Math.PI / 2);
+    chlorineCtx.fillText("Chlorine (mg/L)", 0, 0);
+    chlorineCtx.restore();
+
+    chlorineCtx.fillStyle = "#94a3b8";
+    chlorineCtx.font = "11px Bahnschrift";
+    chlorineCtx.textAlign = "center";
+    chlorineCtx.fillText("Time", (left + right) / 2, height - 10);
+  }
+
+  window.addEventListener("resize", drawChlorineChart);
+  drawChlorineChart();
+</script>
+{% endblock %}

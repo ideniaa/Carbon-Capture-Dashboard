@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">WinCC</p>
+        <h2>SQL process data</h2>
+      </div>
+      <div class="history-actions">
+        <a class="link-button" href="{{ url_for('export_wincc') }}">Download Excel Sheet</a>
+      </div>
+    </div>
+  </section>
+
+  {% for source in wincc_sources %}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">{{ source.qualified_name }}</p>
+        <h2>{% if loop.first %}Primary process values{% else %}Secondary process values{% endif %}</h2>
+      </div>
+      <span class="wincc-count">{{ source.row_count }} rows</span>
+    </div>
+
+    {% if source.error %}
+      <p class="placeholder-copy">{{ source.error }}</p>
+    {% elif source.rows %}
+      <div class="wincc-latest-grid">
+        {% for item in source.latest %}
+        <article class="metric-card accent-blue wincc-metric">
+          <span class="metric-label">{{ item.label }}</span>
+          <strong class="metric-value compact results-card-value">{{ item.value }}</strong>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="table-wrap wincc-table-wrap">
+        <table class="results-table wincc-table">
+          <thead>
+            <tr>
+              {% for col in source.columns %}
+              <th class="{% if loop.first %}sticky-col{% endif %}">{{ col.label }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in source.rows %}
+            <tr>
+              {% for cell in row %}
+              <td class="{% if loop.first %}sticky-col{% endif %}">{{ cell }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-actions">
+        <form method="post" action="{{ url_for('clear_wincc') }}">
+          <input type="hidden" name="table_ref" value="{{ source.table_ref }}">
+          <button class="danger-button" type="submit" onclick="return confirm('Clear all rows from {{ source.qualified_name }}?')">Clear table</button>
+        </form>
+      </div>
+    {% else %}
+      <p class="placeholder-copy">No rows available.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+{% endblock %}

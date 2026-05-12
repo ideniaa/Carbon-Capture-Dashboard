@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel panel-visual">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Visualize</p>
+        <h2>Channel readings over time</h2>
+      </div>
+      <div class="voltage-chart-controls" aria-label="Voltage chart channels">
+        <button class="voltage-chart-nav" id="voltage-prev-channels" type="button" title="Previous channels" aria-label="Previous channels">&larr;</button>
+        <span class="voltage-chart-range" id="voltage-channel-range"></span>
+        <button class="voltage-chart-nav" id="voltage-next-channels" type="button" title="Next channels" aria-label="Next channels">&rarr;</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="voltage-chart" width="960" height="320" aria-label="Voltage channel readings chart"></canvas>
+    </div>
+  </section>
+
+  <section class="panel panel-control">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Control</p>
+        <h2>WinDAQ-MSSQL</h2>
+      </div>
+    </div>
+
+    <div class="control-layout">
+      <div class="control-box">
+        <h3>App commands</h3>
+        <div class="app-status {% if windaq_running %}running{% else %}stopped{% endif %}" id="windaq-app-status">
+          <span class="app-status-dot"></span>
+          <div>
+            <span>WINDAQ-MSSQL window</span>
+            <strong id="windaq-app-status-text">{{ windaq_status }}</strong>
+          </div>
+        </div>
+        <div class="control-buttons">
+          <form method="post" action="{{ url_for('voltage_command') }}" style="display:contents;">
+            <button class="command-button start" type="submit" name="command" value="Start WinDAQ-MSSQL">Start WinDAQ-MSSQL</button>
+          </form>
+          <form method="post" action="{{ url_for('voltage_command') }}" style="display:contents;">
+            <button class="command-button stop" type="submit" name="command" value="Stop WinDAQ-MSSQL">Close WinDAQ-MSSQL</button>
+          </form>
+        </div>
+      </div>
+
+      <aside class="command-log">
+        <h3>Command log</h3>
+        <ul id="voltage-command-log-list">
+          {% for entry in voltage_command_log %}
+          <li><strong>{{ entry.command }}</strong><br><span>{{ entry.time }}</span></li>
+          {% endfor %}
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">New Entry</p>
+        <h2>Manual data entry</h2>
+      </div>
+    </div>
+    <div class="chlorine-layout">
+      <div class="control-box">
+        <h3>Add a voltage reading</h3>
+        <form class="entry-form" method="post" action="{{ url_for('create_voltage_entry') }}">
+          <label><span>Timestamp</span><input name="timestamp" type="datetime-local"></label>
+          <div class="voltage-entry-channels" aria-label="Voltage channels">
+          {% for col in voltage_channel_columns %}
+            <label><span>{{ col.replace('_', ' ').title() }} (V)</span><input name="{{ col }}" type="number" step="any" required></label>
+          {% endfor %}
+          </div>
+          <label><span>Note</span><textarea name="note" rows="3" placeholder="Optional note"></textarea></label>
+          <button class="solid-button" type="submit">Save entry</button>
+        </form>
+      </div>
+      <div class="control-box">
+        <h3>Operator notes</h3>
+        <textarea id="voltageOperatorNote" rows="6" placeholder="Type a note here — saved in your browser automatically." style="width:100%;resize:vertical;padding:0.5rem;font-size:0.9rem;border:1px solid var(--line);border-radius:12px;background:var(--panel-strong);color:var(--ink);"></textarea>
+        <p class="placeholder-copy" style="margin-top:0.5rem;font-size:0.8rem;">Notes are saved locally in your browser and do not reset on page refresh.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">History</p>
+        <h2>Recent voltage readings</h2>
+      </div>
+      <div class="history-actions">
+        <a class="link-button" href="{{ url_for('export_voltage') }}">Download Excel Sheet</a>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            {% for col in voltage_channel_columns %}
+            <th>{{ col.replace('_', ' ').title() }} (V)</th>
+            {% endfor %}
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="voltage-tbody">
+          {% for row in voltage_entries %}
+          <tr data-rowkey="{{ row.timestamp_key }}" data-note="{{ row.note or '' }}">
+            <td>{{ row.timestamp }}</td>
+            {% for col in voltage_channel_columns %}
+            <td>{{ row.channels.get(col, '') }}</td>
+            {% endfor %}
+            <td class="note-cell"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-actions">
+      <form method="post" action="{{ url_for('clear_voltage') }}">
+        <button class="danger-button" type="submit" onclick="return confirm('Clear all voltage entries?')">Clear table</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+
+{% block page_data %}
+  <script id="initial-voltage-data" type="application/json">{{ voltage_entries | tojson }}</script>
+  <script id="voltage-channel-cols" type="application/json">{{ voltage_channel_columns | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const rawEntries = JSON.parse(document.getElementById("initial-voltage-data").textContent);
+  const KEYS = JSON.parse(document.getElementById("voltage-channel-cols").textContent);
+  const CHANNELS_PER_PAGE = 5;
+  const _PALETTE = ["#0077b6","#0d9488","#d97706","#e05252","#7c3aed","#059669","#dc2626","#ea580c","#0891b2","#65a30d"];
+  const COLORS = Object.fromEntries(KEYS.map((k, i) => [k, _PALETTE[i % _PALETTE.length]]));
+  const LABELS = Object.fromEntries(KEYS.map((k, i) => [k, `CH${i + 1}`]));
+  let voltageChannelPage = 0;
+
+  function parseVoltageTimestamp(row) {
+    const timestamp = Date.parse(row.timestamp_key || row.timestamp || "");
+    return Number.isFinite(timestamp) ? timestamp : NaN;
+  }
+
+  function formatVoltageTime(timestamp) {
+    if (!Number.isFinite(timestamp)) return "";
+    return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  const voltageData = rawEntries.map(r => {
+    const ch = r.channels || {};
+    const timeMs = parseVoltageTimestamp(r);
+    const entry = {
+      time_ms: timeMs,
+      chart_time: formatVoltageTime(timeMs) || r.timestamp || "",
+    };
+    KEYS.forEach(k => {
+      const value = parseFloat(ch[k]);
+      entry[k] = Number.isFinite(value) ? value : NaN;
+    });
+    return entry;
+  }).filter(row => Number.isFinite(row.time_ms)).sort((a, b) => a.time_ms - b.time_ms);
+
+  const canvas = document.getElementById("voltage-chart");
+  const ctx = canvas.getContext("2d");
+  const prevChannelsButton = document.getElementById("voltage-prev-channels");
+  const nextChannelsButton = document.getElementById("voltage-next-channels");
+  const channelRange = document.getElementById("voltage-channel-range");
+
+  function getVoltagePageCount() {
+    return Math.max(1, Math.ceil(KEYS.length / CHANNELS_PER_PAGE));
+  }
+
+  function getActiveVoltageKeys() {
+    const start = voltageChannelPage * CHANNELS_PER_PAGE;
+    return KEYS.slice(start, start + CHANNELS_PER_PAGE);
+  }
+
+  function updateVoltageChannelControls() {
+    const pageCount = getVoltagePageCount();
+    voltageChannelPage = Math.min(voltageChannelPage, pageCount - 1);
+    const start = KEYS.length ? voltageChannelPage * CHANNELS_PER_PAGE + 1 : 0;
+    const end = Math.min((voltageChannelPage + 1) * CHANNELS_PER_PAGE, KEYS.length);
+    channelRange.textContent = `${start}-${end} of ${KEYS.length}`;
+    prevChannelsButton.disabled = voltageChannelPage === 0;
+    nextChannelsButton.disabled = voltageChannelPage >= pageCount - 1;
+  }
+
+  function drawVoltageChart(rows) {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const activeKeys = getActiveVoltageKeys();
+    updateVoltageChannelControls();
+    if (!rows.length) return;
+
+    const LEFT = 72, RIGHT = W - 16, TIME_H = 44;
+    const LANE_H = Math.floor((H - TIME_H) / Math.max(activeKeys.length, 1));
+    const timeValues = rows.map(row => row.time_ms).filter(Number.isFinite);
+    if (!timeValues.length) return;
+    const minTime = Math.min(...timeValues);
+    const maxTime = Math.max(...timeValues);
+    const toX = row => (
+      maxTime === minTime
+        ? LEFT + (RIGHT - LEFT) / 2
+        : LEFT + ((row.time_ms - minTime) / (maxTime - minTime)) * (RIGHT - LEFT)
+    );
+
+    activeKeys.forEach((k, laneIdx) => {
+      const laneTop = laneIdx * LANE_H;
+      const laneBot = laneTop + LANE_H;
+      const plotTop = laneTop + 10;
+      const plotBot = laneBot - 10;
+
+      ctx.fillStyle = laneIdx % 2 === 0 ? "rgba(0,0,0,0.018)" : "rgba(255,255,255,0)";
+      ctx.fillRect(LEFT, laneTop, RIGHT - LEFT, LANE_H);
+
+      ctx.strokeStyle = "rgba(30,41,59,0.13)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(LEFT, laneBot); ctx.lineTo(RIGHT, laneBot); ctx.stroke();
+
+      const points = rows
+        .map(row => ({ row, value: Number(row[k]) }))
+        .filter(point => Number.isFinite(point.value) && Number.isFinite(point.row.time_ms));
+      const vals = points.map(point => point.value);
+      if (!vals.length) return;
+      let lo = Math.min(...vals), hi = Math.max(...vals);
+      const pad = (hi - lo) * 0.25 || 0.05;
+      lo -= pad; hi += pad;
+      const mid = (lo + hi) / 2;
+      const toY = v => plotBot - ((v - lo) / (hi - lo)) * (plotBot - plotTop);
+
+      [hi, mid, lo].forEach(v => {
+        const y = toY(v);
+        ctx.strokeStyle = "rgba(30,41,59,0.07)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 5]);
+        ctx.beginPath(); ctx.moveTo(LEFT, y); ctx.lineTo(RIGHT, y); ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      ctx.fillStyle = "#64748b"; ctx.font = "11px Bahnschrift"; ctx.textAlign = "right";
+      ctx.fillText(hi.toFixed(3),  LEFT - 4, plotTop + 4);
+      ctx.fillText(mid.toFixed(3), LEFT - 4, toY(mid) + 4);
+      ctx.fillText(lo.toFixed(3),  LEFT - 4, plotBot + 1);
+
+      ctx.save();
+      ctx.fillStyle = COLORS[k];
+      ctx.font = "bold 12px Bahnschrift";
+      ctx.textAlign = "center";
+      ctx.translate(28, laneTop + LANE_H / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(LABELS[k], 0, 0);
+      ctx.restore();
+
+      ctx.beginPath();
+      let started = false;
+      rows.forEach(row => {
+        const value = Number(row[k]);
+        if (!Number.isFinite(value) || !Number.isFinite(row.time_ms)) {
+          started = false;
+          return;
+        }
+        const x = toX(row);
+        const y = toY(value);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = COLORS[k];
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([]);
+      ctx.stroke();
+
+      const lastPoint = points[points.length - 1];
+      ctx.fillStyle = COLORS[k];
+      ctx.font = "11px Bahnschrift";
+      ctx.textAlign = "left";
+      ctx.fillText(lastPoint.value.toFixed(3), toX(lastPoint.row) + 5, toY(lastPoint.value) + 4);
+    });
+
+    ctx.strokeStyle = "rgba(30,41,59,0.2)"; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(LEFT, 0); ctx.lineTo(LEFT, H - TIME_H); ctx.stroke();
+
+    ctx.save();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px Bahnschrift";
+    ctx.textAlign = "center";
+    ctx.translate(7, (H - TIME_H) / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("Voltage (V)", 0, 0);
+    ctx.restore();
+
+    ctx.fillStyle = "#64748b"; ctx.font = "11px Bahnschrift"; ctx.textAlign = "center";
+    let lastLabelX = -Infinity;
+    rows.forEach((row, i) => {
+      const x = toX(row);
+      if (i === 0 || x - lastLabelX >= 64) {
+        ctx.fillText(row.chart_time, x, H - TIME_H + 14);
+        lastLabelX = x;
+      }
+    });
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px Bahnschrift";
+    ctx.textAlign = "center";
+    ctx.fillText("Time", (LEFT + RIGHT) / 2, H - 8);
+  }
+
+  window.addEventListener("resize", () => drawVoltageChart(voltageData));
+  prevChannelsButton.addEventListener("click", () => {
+    voltageChannelPage = Math.max(voltageChannelPage - 1, 0);
+    drawVoltageChart(voltageData);
+  });
+  nextChannelsButton.addEventListener("click", () => {
+    voltageChannelPage = Math.min(voltageChannelPage + 1, getVoltagePageCount() - 1);
+    drawVoltageChart(voltageData);
+  });
+  drawVoltageChart(voltageData);
+
+  const opNote = document.getElementById("voltageOperatorNote");
+  opNote.value = localStorage.getItem("voltageOperatorNote") || "";
+  opNote.addEventListener("input", () => localStorage.setItem("voltageOperatorNote", opNote.value));
+</script>
+<script src="{{ url_for('static', filename='inline-notes.js') }}"></script>
+<script>
+  initNoteCells("voltage-tbody", "/api/voltage-note");
+</script>
+<script>
+  (function () {
+    const statusEl = document.getElementById("windaq-app-status");
+    const statusText = document.getElementById("windaq-app-status-text");
+    async function pollWindaqStatus() {
+      try {
+        const res = await fetch("/api/windaq-status");
+        const data = await res.json();
+        if (statusEl) {
+          statusEl.classList.toggle("running", Boolean(data.running));
+          statusEl.classList.toggle("stopped", !data.running);
+        }
+        if (statusText) statusText.textContent = data.label;
+      } catch (_) {}
+    }
+    pollWindaqStatus();
+    setInterval(pollWindaqStatus, 5000);
+  })();
+</script>
+{% endblock %}

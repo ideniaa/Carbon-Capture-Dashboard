@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  {# ── Team Announcements ── #}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Team Board</p>
+        <h2>Announcements</h2>
+      </div>
+    </div>
+
+    <div class="home-layout">
+      <div class="control-box">
+        <h3>Post an announcement</h3>
+        <form class="entry-form announcement-form" method="post" action="{{ url_for('create_announcement') }}">
+          <label><span>Your name</span><input name="author" type="text" placeholder="e.g. Joe"></label>
+          <label><span>Message</span><textarea name="message" rows="4" placeholder="Write your announcement here…" required></textarea></label>
+          <button class="solid-button" type="submit">Save entry</button>
+        </form>
+      </div>
+
+      <div class="announcement-feed">
+        {% if announcements %}
+          {% for ann in announcements %}
+          <div class="announcement-card">
+            <div class="announcement-meta">
+              <span class="announcement-author">{{ ann.author }}</span>
+              <span class="announcement-time">{{ ann.timestamp }}</span>
+              <form method="post" action="{{ url_for('delete_announcement', ann_id=ann.id) }}" style="margin-left:auto;">
+                <button class="ann-delete-btn" type="submit" title="Delete">&#x2715;</button>
+              </form>
+            </div>
+            <p class="announcement-message">{{ ann.message }}</p>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="placeholder-copy" style="padding:1rem 0;">No announcements yet. Post one to get started.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {# ── Tab Snapshots ── #}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Overview</p>
+        <h2>Latest readings across all tabs</h2>
+      </div>
+    </div>
+
+    <div class="snapshot-grid">
+
+      {# Titrator #}
+      <a class="snapshot-card" href="{{ url_for('titrator_page') }}">
+        <div class="snapshot-header accent-blue">
+          <span class="snapshot-label">Titrator</span>
+          <span class="snapshot-arrow">→</span>
+        </div>
+        <div class="snapshot-body">
+          {% if latest_titrator %}
+            <div class="snapshot-row"><span>Sequence</span><strong>{{ titrator_summary.sequence_status }}</strong></div>
+            <div class="snapshot-row"><span>Program A</span><strong>{{ titrator_summary.program_a_status }}</strong></div>
+            <div class="snapshot-row"><span>Program B</span><strong>{{ titrator_summary.program_b_status }}</strong></div>
+            <div class="snapshot-row"><span>Latest R1</span><strong>{{ titrator_summary.r1_value }}</strong></div>
+            <div class="snapshot-row"><span>Latest R2</span><strong>{{ titrator_summary.r2_value }}</strong></div>
+          {% else %}
+            <p class="placeholder-copy">No readings yet.</p>
+          {% endif %}
+        </div>
+      </a>
+
+      {# Chlorine #}
+      <a class="snapshot-card" href="{{ url_for('chlorine_page') }}">
+        <div class="snapshot-header accent-green">
+          <span class="snapshot-label">Chlorine</span>
+          <span class="snapshot-arrow">→</span>
+        </div>
+        <div class="snapshot-body">
+          {% if latest_chlorine %}
+            <div class="snapshot-row"><span>Latest reading</span><strong>{{ latest_chlorine.value }} mg/L</strong></div>
+            <div class="snapshot-row"><span>Timestamp</span><strong>{{ latest_chlorine.home_timestamp }}</strong></div>
+            {% if latest_chlorine.note %}
+            <div class="snapshot-row"><span>Note</span><strong>{{ latest_chlorine.note }}</strong></div>
+            {% endif %}
+          {% else %}
+            <p class="placeholder-copy">No measurements yet.</p>
+          {% endif %}
+        </div>
+      </a>
+
+      {# Results #}
+      <a class="snapshot-card" href="{{ url_for('results_page') }}">
+        <div class="snapshot-header accent-gold">
+          <span class="snapshot-label">Results</span>
+          <span class="snapshot-arrow">→</span>
+        </div>
+        <div class="snapshot-body">
+          {% if latest_results %}
+            <div class="snapshot-row"><span>Timestamp</span><strong>{{ latest_results.timestamp }}</strong></div>
+            <div class="snapshot-row"><span>Catholyte pH</span><strong>{{ latest_results.catholyte_ph }}</strong></div>
+            <div class="snapshot-row"><span>Anolyte pH</span><strong>{{ latest_results.anolyte_ph }}</strong></div>
+            <div class="snapshot-row"><span>Stack Current</span><strong>{{ latest_results.stack_current }} A</strong></div>
+            <div class="snapshot-row"><span>CIER</span><strong>{{ latest_results.cier }}</strong></div>
+          {% else %}
+            <p class="placeholder-copy">No entries yet.</p>
+          {% endif %}
+        </div>
+      </a>
+
+      {# Voltage #}
+      <a class="snapshot-card" href="{{ url_for('voltage_page') }}">
+        <div class="snapshot-header accent-red">
+          <span class="snapshot-label">Voltage</span>
+          <span class="snapshot-arrow">→</span>
+        </div>
+        <div class="snapshot-body">
+          {% if latest_voltage %}
+            {% for col in voltage_channel_columns[:5] %}
+            <div class="snapshot-row"><span>{{ col.replace('_', ' ').title() }}</span><strong>{{ latest_voltage.channels.get(col, '') }} V</strong></div>
+            {% endfor %}
+          {% else %}
+            <p class="placeholder-copy">No entries yet.</p>
+          {% endif %}
+        </div>
+      </a>
+
+      {# WinCC #}
+      <a class="snapshot-card" href="{{ url_for('wincc_page') }}">
+        <div class="snapshot-header accent-slate">
+          <span class="snapshot-label">WinCC</span>
+          <span class="snapshot-arrow">&rarr;</span>
+        </div>
+        <div class="snapshot-body">
+          {% if wincc_sources %}
+            {% for source in wincc_sources[:2] %}
+            <div class="snapshot-row"><span>{{ source.table }}</span><strong>{{ source.home_status }}</strong></div>
+            {% endfor %}
+          {% else %}
+            <p class="placeholder-copy">No process data yet.</p>
+          {% endif %}
+        </div>
+      </a>
+
+    </div>
+  </section>
+
+  {# ── Data Management ── #}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Data Management</p>
+        <h2>All tables</h2>
+      </div>
+    </div>
+    <form method="post" id="data-mgmt-form">
+      <div class="clear-table-checks">
+        <label class="clear-table-check">
+          <input type="checkbox" name="tables" value="titrator"> Titrator
+        </label>
+        <label class="clear-table-check">
+          <input type="checkbox" name="tables" value="chlorine"> Chlorine
+        </label>
+        <label class="clear-table-check">
+          <input type="checkbox" name="tables" value="results"> Results
+        </label>
+        <label class="clear-table-check">
+          <input type="checkbox" name="tables" value="voltage"> Voltage
+        </label>
+        <label class="clear-table-check">
+          <input type="checkbox" name="tables" value="wincc"> WinCC
+        </label>
+      </div>
+      <div class="history-actions" style="margin-top:12px;">
+        <button type="button" class="ghost-button" id="select-all-tables">Select all</button>
+        <button type="submit" class="link-button" formaction="{{ url_for('export_all') }}" onclick="
+          var checked = document.querySelectorAll('#data-mgmt-form input[type=checkbox]:checked');
+          if (checked.length === 0) { alert('Select at least one table to download.'); return false; }
+        ">Download selected</button>
+        <button type="submit" class="danger-button" formaction="{{ url_for('clear_all') }}" onclick="
+          var checked = document.querySelectorAll('#data-mgmt-form input[type=checkbox]:checked');
+          if (checked.length === 0) { alert('Select at least one table to clear.'); return false; }
+          var names = Array.from(checked).map(function(c){ return c.parentElement.textContent.trim(); }).join(', ');
+          return confirm('Clear: ' + names + '? This cannot be undone.');
+        ">Clear selected</button>
+      </div>
+    </form>
+    <script>
+      document.getElementById('select-all-tables').addEventListener('click', function () {
+        var boxes = document.querySelectorAll('#data-mgmt-form input[type=checkbox]');
+        var allChecked = Array.from(boxes).every(function(b){ return b.checked; });
+        boxes.forEach(function(b){ b.checked = !allChecked; });
+        this.textContent = allChecked ? 'Select all' : 'Deselect all';
+      });
+    </script>
+  </section>
+
+  <div class="home-charts-grid">
+
+    {# ── Titrator Chart ── #}
+    <section class="panel panel-visual">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Titrator</p>
+        </div>
+        <div class="legend">
+          <span><i class="legend-swatch swatch-r1"></i>R1</span>
+          <span><i class="legend-swatch swatch-r2"></i>R2</span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="home-titrator-chart" width="960" height="320" aria-label="Titrator R1 and R2 chart"></canvas>
+      </div>
+    </section>
+
+    {# ── Voltage Chart ── #}
+    <section class="panel panel-visual">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Voltage</p>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="home-voltage-chart" width="960" height="320" aria-label="Voltage channel readings chart"></canvas>
+      </div>
+    </section>
+
+    {# ── Chlorine Chart ── #}
+    <section class="panel panel-visual">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Chlorine</p>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="home-chlorine-chart" width="960" height="320" aria-label="Chlorine readings chart"></canvas>
+      </div>
+    </section>
+
+  </div>
+
+{% endblock %}
+
+{% block page_data %}
+  <script id="home-titrator-data" type="application/json">{{ titrator_history | tojson }}</script>
+  <script id="home-voltage-data" type="application/json">{{ voltage_entries | tojson }}</script>
+  <script id="home-voltage-channel-cols" type="application/json">{{ voltage_channel_columns | tojson }}</script>
+  <script id="home-chlorine-data" type="application/json">{{ chlorine_measurements | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* ── Titrator chart ── */
+  (function() {
+    const rows = JSON.parse(document.getElementById("home-titrator-data").textContent);
+    const canvas = document.getElementById("home-titrator-chart");
+    const ctx = canvas.getContext("2d");
+
+    function formatTitratorValue(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "—";
+      const text = number.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+      return text || "0";
+    }
+
+    function draw(rows) {
+      const { width, height } = canvas;
+      ctx.clearRect(0, 0, width, height);
+
+      const keys = ["r1", "r2"];
+      const allValues = rows.flatMap(r => keys.map(k => Number(r[k]))).filter(Number.isFinite);
+      if (!allValues.length) return;
+
+      const low = Math.min(...allValues), high = Math.max(...allValues);
+      const spread = Math.max(high - low, Math.abs(high) * 0.05, 0.000001);
+      const min = low - spread * 0.1, max = high + spread * 0.1;
+      const left = 70, right = width - 20, top = 24, bottom = height - 58;
+
+      ctx.strokeStyle = "rgba(31, 41, 51, 0.12)"; ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = top + ((bottom - top) / 4) * i;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+        ctx.fillStyle = "#6b7280"; ctx.font = "12px Bahnschrift";
+        ctx.textAlign = "right";
+        ctx.fillText(formatTitratorValue(max - ((max - min) / 4) * i), left - 4, y + 4);
+      }
+
+      const seriesConfig = {
+        r1: { color: "#0077b6", dotColor: "rgba(0, 119, 182, 0.22)" },
+        r2: { color: "#d97706", dotColor: "rgba(217, 119, 6, 0.22)" },
+      };
+
+      keys.forEach((key, keyIndex) => {
+        const activeRows = rows.filter(r => r[key] != null);
+        if (!activeRows.length) return;
+        const { color, dotColor } = seriesConfig[key];
+
+        const toPoint = (value, index) => ({
+          x: left + ((right - left) / Math.max(activeRows.length - 1, 1)) * index,
+          y: bottom - ((value - min) / (max - min)) * (bottom - top),
+        });
+
+        ctx.beginPath();
+        activeRows.forEach((row, index) => {
+          const point = toPoint(Number(row[key]), index);
+          if (index === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        });
+        ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.stroke();
+
+        activeRows.forEach((row, index) => {
+          const point = toPoint(Number(row[key]), index);
+          ctx.beginPath(); ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = dotColor; ctx.fill();
+        });
+
+        if (keyIndex === 0) {
+          const maxLabels = Math.max(2, Math.floor((right - left) / 64));
+          const step = Math.max(1, Math.ceil(activeRows.length / maxLabels));
+          ctx.fillStyle = "#6b7280"; ctx.font = "13px Bahnschrift";
+          ctx.textAlign = "center";
+          activeRows.forEach((row, index) => {
+            if (index % step === 0) {
+              const point = toPoint(Number(row[key]), index);
+              ctx.fillText(row.chart_time, point.x, bottom + 16);
+            }
+          });
+        }
+      });
+    }
+
+    window.addEventListener("resize", () => draw(rows));
+    draw(rows);
+  })();
+
+  /* ── Voltage chart ── */
+  (function() {
+    const rawEntries = JSON.parse(document.getElementById("home-voltage-data").textContent);
+    const KEYS = JSON.parse(document.getElementById("home-voltage-channel-cols").textContent);
+    const ACTIVE_KEYS = KEYS.slice(0, 5);
+    const _PALETTE = ["#0077b6","#0d9488","#d97706","#e05252","#7c3aed","#059669","#dc2626","#ea580c","#0891b2","#65a30d"];
+    const COLORS = Object.fromEntries(KEYS.map((k, i) => [k, _PALETTE[i % _PALETTE.length]]));
+    const LABELS = Object.fromEntries(KEYS.map((k, i) => [k, `CH${i + 1}`]));
+
+    function parseVoltageTimestamp(row) {
+      const timestamp = Date.parse(row.timestamp_key || row.timestamp || "");
+      return Number.isFinite(timestamp) ? timestamp : NaN;
+    }
+
+    function formatVoltageTime(timestamp) {
+      if (!Number.isFinite(timestamp)) return "";
+      return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+
+    const voltageData = rawEntries.map(r => {
+      const ch = r.channels || {};
+      const timeMs = parseVoltageTimestamp(r);
+      const entry = {
+        time_ms: timeMs,
+        chart_time: formatVoltageTime(timeMs) || r.timestamp || "",
+      };
+      KEYS.forEach(k => {
+        const value = parseFloat(ch[k]);
+        entry[k] = Number.isFinite(value) ? value : NaN;
+      });
+      return entry;
+    }).filter(row => Number.isFinite(row.time_ms)).sort((a, b) => a.time_ms - b.time_ms);
+    const canvas = document.getElementById("home-voltage-chart");
+    const ctx = canvas.getContext("2d");
+
+    function draw(rows) {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      if (!rows.length) return;
+      const LEFT = 72, RIGHT = W - 16, TIME_H = 44;
+      const LANE_H = Math.floor((H - TIME_H) / Math.max(ACTIVE_KEYS.length, 1));
+      const timeValues = rows.map(row => row.time_ms).filter(Number.isFinite);
+      if (!timeValues.length) return;
+      const minTime = Math.min(...timeValues);
+      const maxTime = Math.max(...timeValues);
+      const toX = row => (
+        maxTime === minTime
+          ? LEFT + (RIGHT - LEFT) / 2
+          : LEFT + ((row.time_ms - minTime) / (maxTime - minTime)) * (RIGHT - LEFT)
+      );
+
+      ACTIVE_KEYS.forEach((k, laneIdx) => {
+        const laneTop = laneIdx * LANE_H, laneBot = laneTop + LANE_H;
+        const plotTop = laneTop + 10, plotBot = laneBot - 10;
+
+        ctx.fillStyle = laneIdx % 2 === 0 ? "rgba(0,0,0,0.018)" : "rgba(255,255,255,0)";
+        ctx.fillRect(LEFT, laneTop, RIGHT - LEFT, LANE_H);
+        ctx.strokeStyle = "rgba(30,41,59,0.13)"; ctx.lineWidth = 1; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(LEFT, laneBot); ctx.lineTo(RIGHT, laneBot); ctx.stroke();
+
+        const points = rows
+          .map(row => ({ row, value: Number(row[k]) }))
+          .filter(point => Number.isFinite(point.value) && Number.isFinite(point.row.time_ms));
+        const vals = points.map(point => point.value);
+        if (!vals.length) return;
+        let lo = Math.min(...vals), hi = Math.max(...vals);
+        const pad = (hi - lo) * 0.25 || 0.05; lo -= pad; hi += pad;
+        const mid = (lo + hi) / 2;
+        const toY = v => plotBot - ((v - lo) / (hi - lo)) * (plotBot - plotTop);
+
+        [hi, mid, lo].forEach(v => {
+          const y = toY(v);
+          ctx.strokeStyle = "rgba(30,41,59,0.07)"; ctx.lineWidth = 1; ctx.setLineDash([4,5]);
+          ctx.beginPath(); ctx.moveTo(LEFT, y); ctx.lineTo(RIGHT, y); ctx.stroke();
+          ctx.setLineDash([]);
+        });
+        ctx.fillStyle = "#64748b"; ctx.font = "11px Bahnschrift"; ctx.textAlign = "right";
+        ctx.fillText(hi.toFixed(3), LEFT - 4, plotTop + 4);
+        ctx.fillText(mid.toFixed(3), LEFT - 4, toY(mid) + 4);
+        ctx.fillText(lo.toFixed(3), LEFT - 4, plotBot + 1);
+
+        ctx.save(); ctx.fillStyle = COLORS[k]; ctx.font = "bold 12px Bahnschrift"; ctx.textAlign = "center";
+        ctx.translate(28, laneTop + LANE_H / 2); ctx.rotate(-Math.PI / 2);
+        ctx.fillText(LABELS[k], 0, 0); ctx.restore();
+
+        ctx.beginPath();
+        let started = false;
+        rows.forEach(row => {
+          const value = Number(row[k]);
+          if (!Number.isFinite(value) || !Number.isFinite(row.time_ms)) {
+            started = false;
+            return;
+          }
+          const x = toX(row), y = toY(value);
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.strokeStyle = COLORS[k]; ctx.lineWidth = 2.5; ctx.setLineDash([]); ctx.stroke();
+
+        const lastPoint = points[points.length - 1];
+        ctx.fillStyle = COLORS[k]; ctx.font = "11px Bahnschrift"; ctx.textAlign = "left";
+        ctx.fillText(lastPoint.value.toFixed(3), toX(lastPoint.row) + 5, toY(lastPoint.value) + 4);
+      });
+
+      ctx.strokeStyle = "rgba(30,41,59,0.2)"; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(LEFT, 0); ctx.lineTo(LEFT, H - TIME_H); ctx.stroke();
+
+      ctx.fillStyle = "#64748b"; ctx.font = "11px Bahnschrift"; ctx.textAlign = "center";
+      let lastLabelX = -Infinity;
+      rows.forEach((row, i) => {
+        const x = toX(row);
+        if (i === 0 || x - lastLabelX >= 64) {
+          ctx.fillText(row.chart_time, x, H - TIME_H + 14);
+          lastLabelX = x;
+        }
+      });
+    }
+
+    window.addEventListener("resize", () => draw(voltageData));
+    draw(voltageData);
+  })();
+
+  /* ── Chlorine chart ── */
+  (function() {
+    const rows = [...JSON.parse(document.getElementById("home-chlorine-data").textContent)].reverse();
+    const canvas = document.getElementById("home-chlorine-chart");
+    const ctx = canvas.getContext("2d");
+
+    function draw() {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      if (!rows.length) {
+        ctx.fillStyle = "#6b7280"; ctx.font = "16px Bahnschrift";
+        ctx.fillText("No chlorine measurements yet", 24, 40);
+        return;
+      }
+      const values = rows.map(r => parseFloat(r.value) || 0);
+      const minV = Math.min(...values), maxV = Math.max(...values);
+      const pad = Math.max((maxV - minV) * 0.1, 0.5);
+      const lo = minV - pad, hi = maxV + pad;
+      const left = 72, right = W - 22, top = 28, bottom = H - 58;
+      const pw = right - left, ph = bottom - top;
+
+      ctx.strokeStyle = "rgba(31,41,51,0.12)"; ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = top + (ph / 4) * i;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+        ctx.fillStyle = "#6b7280"; ctx.font = "12px Bahnschrift";
+        ctx.textAlign = "right";
+        ctx.fillText((hi - ((hi - lo) / 4) * i).toFixed(2), left - 8, y + 4);
+      }
+
+      const pt = (v, i) => ({
+        x: left + (rows.length === 1 ? pw / 2 : (pw / Math.max(rows.length - 1, 1)) * i),
+        y: bottom - ((v - lo) / (hi - lo)) * ph,
+      });
+
+      ctx.strokeStyle = "#1e5eff"; ctx.lineWidth = 3; ctx.beginPath();
+      rows.forEach((r, i) => { const p = pt(parseFloat(r.value) || 0, i); i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+
+      rows.forEach((r, i) => {
+        const p = pt(parseFloat(r.value) || 0, i);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff"; ctx.fill();
+        ctx.strokeStyle = "#1e5eff"; ctx.lineWidth = 2; ctx.stroke();
+      });
+
+      ctx.fillStyle = "#6b7280"; ctx.font = "12px Bahnschrift";
+      ctx.textAlign = "left";
+      rows.forEach((r, i) => {
+        const p = pt(parseFloat(r.value) || 0, i);
+        const label = r.timestamp;
+        const tw = ctx.measureText(label).width;
+        ctx.fillText(label, Math.min(Math.max(p.x - tw / 2, left), right - tw), bottom + 18);
+      });
+    }
+
+    window.addEventListener("resize", draw);
+    draw();
+  })();
+</script>
+{% endblock %}

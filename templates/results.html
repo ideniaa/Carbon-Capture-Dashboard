@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Results</p>
+        <h2>Chemical calculations</h2>
+      </div>
+    </div>
+
+    <div class="card-grid status-grid">
+      {% for card in result_cards %}
+      <article class="metric-card {{ card.tone }}">
+        <span class="metric-label">{{ card.label }}</span>
+        <strong class="metric-value compact results-card-value">{{ card.value }}</strong>
+        <span class="metric-subtext">{{ card.subtext }}</span>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">New Entry</p>
+        <h2>Manual data entry</h2>
+      </div>
+    </div>
+    <div class="control-box">
+      <h3>Add a results reading</h3>
+      <form class="entry-form results-entry-form" method="post" action="{{ url_for('create_results_entry') }}">
+        <div class="results-form-grid">
+          <label><span>Timestamp</span><input name="timestamp" type="datetime-local"></label>
+          <label><span>Time Running (hrs)</span><input name="time_running" type="number" step="0.01" placeholder="5.25"></label>
+          <label><span>Time Flushing (hrs)</span><input name="time_flushing" type="number" step="0.01" placeholder="0.00"></label>
+          <label><span>Cell to Cell (V)</span><input name="cell_to_cell" type="number" step="0.001" placeholder="3.59"></label>
+          <label><span>Bus 2 Bus (V)</span><input name="bus_2_bus" type="number" step="0.001" placeholder="3.60"></label>
+          <label><span>Tank Temp (C)</span><input name="tank_temp" type="number" step="0.01" placeholder="13.89"></label>
+          <label><span>Catholyte pH</span><input name="catholyte_ph" type="number" step="0.00001" placeholder="7.41"></label>
+          <label><span>Anolyte pH</span><input name="anolyte_ph" type="number" step="0.00001" placeholder="7.20"></label>
+          <label><span>Catholyte Flow (mL/min)</span><input name="catholyte_flow" type="number" step="0.01" placeholder="9994.93"></label>
+          <label><span>Anolyte Flow (mL/min)</span><input name="anolyte_flow" type="number" step="0.01" placeholder="7823.11"></label>
+          <label><span>Stack Current (A)</span><input name="stack_current" type="number" step="1" placeholder="1770"></label>
+          <label><span>Current Density (A/m²)</span><input name="current_density" type="number" step="1" placeholder="287"></label>
+          <label><span>Ca Precipitated (mol/sec)</span><input name="ca_precipitated" type="text" placeholder="0.00E+00"></label>
+          <label><span>Mg Precipitated (mol/sec)</span><input name="mg_precipitated" type="text" placeholder="0.00E+00"></label>
+          <label><span>OH- in Solution (mol/sec)</span><input name="oh_solution" type="text" placeholder="2.23E-15"></label>
+          <label><span>Total OH- (mol/sec)</span><input name="total_oh" type="text" placeholder="-3.92E-05"></label>
+          <label><span>Theoretical OH- (mol/sec)</span><input name="theoretical_oh" type="text" placeholder="1.83E-02"></label>
+          <label><span>Catholyte Dosage (C/mL)</span><input name="catholyte_dosage" type="number" step="0.01" placeholder="10.61"></label>
+          <label><span>Anolyte Dosage (C/mL)</span><input name="anolyte_dosage" type="number" step="0.01" placeholder="8.17"></label>
+          <label><span>CE OH- Titration (%)</span><input name="ce_oh_titration" type="text" placeholder="0%"></label>
+          <label><span>CIER</span><input name="cier" type="text" placeholder="0.0000%"></label>
+        </div>
+        <label><span>Note</span><input name="note" type="text" placeholder="Optional note"></label>
+        <button class="solid-button" type="submit">Save entry</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Experiment Inputs</p>
+        <h2>Instrument readings</h2>
+      </div>
+      <div class="history-actions">
+        <a class="link-button" href="{{ url_for('export_results') }}">Download Excel Sheet</a>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Time Running<br><span class="unit">hrs</span></th>
+            <th>Time Flushing<br><span class="unit">hrs</span></th>
+            <th>Cell to Cell<br><span class="unit">V</span></th>
+            <th>Bus 2 Bus<br><span class="unit">V</span></th>
+            <th>Tank Temp<br><span class="unit">C</span></th>
+            <th>Catholyte pH</th>
+            <th>Anolyte pH</th>
+            <th>Catholyte Flow<br><span class="unit">mL/min</span></th>
+            <th>Anolyte Flow<br><span class="unit">mL/min</span></th>
+            <th>Stack Current<br><span class="unit">A</span></th>
+            <th>Current Density<br><span class="unit">A/m²</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in result_rows %}
+          <tr>
+            <td class="sticky-col">{{ row.timestamp }}</td>
+            <td>{{ row.time_running }}</td>
+            <td>{{ row.time_flushing }}</td>
+            <td>{{ row.cell_to_cell }}</td>
+            <td>{{ row.bus_2_bus }}</td>
+            <td>{{ row.tank_temp }}</td>
+            <td>{{ row.catholyte_ph }}</td>
+            <td>{{ row.anolyte_ph }}</td>
+            <td>{{ row.catholyte_flow }}</td>
+            <td>{{ row.anolyte_flow }}</td>
+            <td>{{ row.stack_current }}</td>
+            <td>{{ row.current_density }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Calculated Results</p>
+        <h2>Chemical outputs</h2>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Ca Precipitated<br><span class="unit">mol/sec</span></th>
+            <th>Mg Precipitated<br><span class="unit">mol/sec</span></th>
+            <th>OH- in Solution<br><span class="unit">mol/sec</span></th>
+            <th>Total OH-<br><span class="unit">mol/sec</span></th>
+            <th>Theoretical OH-<br><span class="unit">mol/sec</span></th>
+            <th>Catholyte Dosage<br><span class="unit">C/mL</span></th>
+            <th>Anolyte Dosage<br><span class="unit">C/mL</span></th>
+            <th>CE OH- (Titration)<br><span class="unit">%</span></th>
+            <th>CIER</th>
+            <th class="note-th">Note</th>
+          </tr>
+        </thead>
+        <tbody id="results-outputs-tbody">
+          {% for row in result_rows %}
+          <tr data-rowkey="{{ row.timestamp_key }}" data-note="{{ row.note or '' }}">
+            <td class="sticky-col">{{ row.timestamp }}</td>
+            <td>{{ row.ca_precipitated }}</td>
+            <td>{{ row.mg_precipitated }}</td>
+            <td>{{ row.oh_solution }}</td>
+            <td>{{ row.total_oh }}</td>
+            <td>{{ row.theoretical_oh }}</td>
+            <td>{{ row.catholyte_dosage }}</td>
+            <td>{{ row.anolyte_dosage }}</td>
+            <td>{{ row.ce_oh_titration }}</td>
+            <td>{{ row.cier }}</td>
+            <td class="note-cell"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-actions">
+      <form method="post" action="{{ url_for('clear_results') }}">
+        <button class="danger-button" type="submit" onclick="return confirm('Clear all results entries?')">Clear table</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='inline-notes.js') }}"></script>
+<script>
+  initNoteCells("results-outputs-tbody", "/api/results-note");
+</script>
+{% endblock %}
+

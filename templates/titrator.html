@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel panel-monitor">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Titrator</p>
+        <h2>Live titrator overview</h2>
+      </div>
+      <p class="section-note"></p>
+    </div>
+
+    <div class="status-band">
+      <div class="status-band-heading">Program status</div>
+      <div class="card-grid status-grid program-status-grid">
+        <article class="metric-card accent-blue">
+          <span class="metric-label">Sequence State</span>
+          <strong class="metric-value" id="sequence-status">{{ summary.sequence_status }}</strong>
+        </article>
+        <article class="metric-card accent-gold">
+          <span class="metric-label">Program A</span>
+          <strong class="metric-value" id="program-a-status">{{ summary.program_a_status }}</strong>
+        </article>
+        <article class="metric-card accent-green">
+          <span class="metric-label">Program B</span>
+          <strong class="metric-value" id="program-b-status">{{ summary.program_b_status }}</strong>
+        </article>
+        <article class="metric-card accent-slate">
+          <span class="metric-label">Analyzer Timestamp</span>
+          <strong class="metric-value compact" id="analyzer-timestamp">{{ summary.analyzer_timestamp }}</strong>
+        </article>
+      </div>
+    </div>
+
+    {#
+    <div class="status-band analyzer-band">
+      <div class="status-band-heading">Analyzer status</div>
+      <div class="card-grid analyzer-status-grid">
+        <article class="metric-card {% if summary.analyzer_on_status == 'On' %}accent-green{% elif summary.analyzer_on_status == 'Off' %}accent-slate{% else %}accent-slate{% endif %}">
+          <span class="metric-label">Analyzer On</span>
+          <strong class="metric-value compact" id="analyzer-on-status">{{ summary.analyzer_on_status }}</strong>
+          <span class="metric-subtext">Discrete input 4</span>
+        </article>
+        <article class="metric-card {% if summary.analyzer_error_status == 'Error' %}accent-red{% elif summary.analyzer_error_status == 'Clear' %}accent-green{% else %}accent-slate{% endif %}">
+          <span class="metric-label">Analyzer Error</span>
+          <strong class="metric-value compact" id="analyzer-error-status">{{ summary.analyzer_error_status }}</strong>
+          <span class="metric-subtext">Discrete input 5</span>
+        </article>
+        <article class="metric-card {% if summary.analyzer_failure_status == 'Failure' %}accent-red{% elif summary.analyzer_failure_status == 'Clear' %}accent-green{% else %}accent-slate{% endif %}">
+          <span class="metric-label">Analyzer Failure</span>
+          <strong class="metric-value compact" id="analyzer-failure-status">{{ summary.analyzer_failure_status }}</strong>
+          <span class="metric-subtext">Discrete input 6</span>
+        </article>
+      </div>
+    </div>
+    #}
+
+    <div class="card-grid reading-grid">
+      <article class="reading-card">
+        <span class="metric-label">Latest R1</span>
+        <strong class="reading-value" id="r1-value">{{ summary.r1_value }}</strong>
+        <span class="reading-trend" id="r1-trend">{{ summary.r1_trend }}</span>
+      </article>
+      <article class="reading-card">
+        <span class="metric-label">Latest R2</span>
+        <strong class="reading-value" id="r2-value">{{ summary.r2_value }}</strong>
+        <span class="reading-trend" id="r2-trend">{{ summary.r2_trend }}</span>
+      </article>
+      <article class="reading-card">
+        <span class="metric-label">Reading Age</span>
+        <strong class="reading-value compact" id="reading-age">{{ summary.reading_age }}</strong>
+        <span class="reading-trend">Auto-refresh active</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel panel-visual">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Visualize</p>
+        <h2>Recent R1 and R2 values</h2>
+      </div>
+      <button class="ghost-button" id="toggle-series" type="button">R1 only</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="trend-chart" width="960" height="300" aria-label="Recent R1 and R2 values chart"></canvas>
+    </div>
+    <div class="legend">
+      <span id="active-series-legend"><i class="legend-swatch swatch-r1"></i>R1 <i class="legend-swatch swatch-r2"></i>R2</span>
+    </div>
+  </section>
+
+  <section class="panel panel-control">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Control</p>
+        <h2>Protected machine actions</h2>
+      </div>
+      <p class="section-note"></p>
+    </div>
+
+    <div class="control-layout">
+      <div class="control-box">
+        <h3>App commands</h3>
+        <div class="app-status {% if summary.titrolyzer_app_running %}running{% else %}stopped{% endif %}" id="titrolyzer-app-status">
+          <span class="app-status-dot"></span>
+          <div>
+            <span>Recording data</span>
+            <strong id="titrolyzer-app-status-text">{{ summary.titrolyzer_app_status }}</strong>
+          </div>
+        </div>
+        <div class="control-buttons">
+          <form method="post" action="{{ url_for('start_titrator_app_route') }}">
+            <button class="command-button app-start" type="submit">Start recording data</button>
+          </form>
+          <form method="post" action="{{ url_for('stop_titrator_app_route') }}">
+            <button class="command-button stop" type="submit" onclick="return confirm('Stop the Titrolyzer app started from this website?')">Stop recording data</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="control-box">
+        <h3>Machine commands</h3>
+        <div class="control-buttons">
+          {% for action in control_actions %}
+          <button class="command-button {{ action.tone }}" type="button" data-command="{{ action.label }}" data-address="{{ action.address }}">
+            {{ action.label }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <aside class="command-log">
+        <h3>Command log</h3>
+        <ul id="command-log-list">
+          {% for entry in command_log %}
+          <li><strong>{{ entry.command }}</strong><br><span>{{ entry.time }}</span></li>
+          {% endfor %}
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">New Entry</p>
+        <h2>Manual data entry</h2>
+      </div>
+    </div>
+    <div class="chlorine-layout">
+      <div class="control-box">
+        <h3>Add titrator reading</h3>
+        <form class="entry-form" id="titrator-entry-form" method="post" action="{{ url_for('create_titrator_entry') }}">
+          <label>
+            <span>R1 value</span>
+            <input id="titrator-r1" name="r1" type="number" step="0.01" placeholder="65.00">
+          </label>
+          <label>
+            <span>R2 value</span>
+            <input id="titrator-r2" name="r2" type="number" step="0.01" placeholder="45.00">
+          </label>
+          <label>
+            <span>Timestamp</span>
+            <input name="timestamp" type="datetime-local">
+          </label>
+          <label>
+            <span>Note</span>
+            <textarea name="note" rows="3" placeholder="Optional note"></textarea>
+          </label>
+          <button class="solid-button" type="submit">Save entry</button>
+        </form>
+        <script>
+          document.getElementById("titrator-entry-form").addEventListener("submit", function(e) {
+            const r1 = document.getElementById("titrator-r1");
+            const r2 = document.getElementById("titrator-r2");
+            if (!r1.value.trim() && !r2.value.trim()) {
+              e.preventDefault();
+              r1.setCustomValidity("Please enter at least R1 or R2.");
+              r1.reportValidity();
+            } else {
+              r1.setCustomValidity("");
+            }
+          });
+          document.getElementById("titrator-r1").addEventListener("input", function() {
+            this.setCustomValidity("");
+          });
+        </script>
+      </div>
+      <div class="control-box">
+        <h3>Operator notes</h3>
+        <textarea id="titratorOperatorNote" rows="3" placeholder="Type a note here - saved in your browser automatically." style="width:100%;resize:vertical;padding:0.5rem;font-size:0.9rem;border:1px solid var(--line);border-radius:12px;background:var(--panel-strong);color:var(--ink);"></textarea>
+        <p class="placeholder-copy" style="margin-top:0.5rem;font-size:0.8rem;">Notes are saved locally in your browser and do not reset on page refresh.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel-history">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">History</p>
+        <h2>Recent titrator readings</h2>
+      </div>
+      <div class="history-actions">
+        <a class="link-button" href="{{ url_for('export_history') }}">Download Excel Sheet</a>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Result_ID</th>
+            <th>Value</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          {% for row in history|reverse %}
+          {% if row.r1 is not none %}
+          <tr class="history-row" data-timestamp="{{ row.timestamp_key }}">
+            <td>{{ row.timestamp }}</td>
+            <td>R1</td>
+            <td>{{ row.r1_display }}</td>
+            <td class="note-cell">{{ row.note }}</td>
+          </tr>
+          {% endif %}
+          {% if row.r2 is not none %}
+          <tr class="history-row" data-timestamp="{{ row.timestamp_key }}">
+            <td>{{ row.timestamp }}</td>
+            <td>R2</td>
+            <td>{{ row.r2_display }}</td>
+            <td class="note-cell">{{ row.note }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-actions">
+      <form method="post" action="{{ url_for('clear_history') }}">
+        <button class="danger-button" type="submit" onclick="return confirm('Clear all titrator rows?')">Clear table</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
+
+{% block page_data %}
+  <script id="initial-dashboard-data" type="application/json">{{ {"history": history}|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script>
+    const opNote = document.getElementById("titratorOperatorNote");
+    opNote.value = localStorage.getItem("titratorOperatorNote") || "";
+    opNote.addEventListener("input", () => localStorage.setItem("titratorOperatorNote", opNote.value));
+
+</script>
+{% endblock %}
